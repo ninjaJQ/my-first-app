@@ -14,6 +14,9 @@
       color: #fff;
       width: 100vw;
       height: 100vh;
+      touch-action: none;
+      -webkit-overflow-scrolling: none;
+      overscroll-behavior: none;
     }
 
     #canvas-container {
@@ -270,6 +273,108 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* ========== MOBILE RESPONSIVE ========== */
+    @media (max-width: 600px) {
+      .webcam-container {
+        width: calc(100vw - 32px);
+        max-width: 280px;
+        top: 12px;
+      }
+
+      .webcam-video-wrap,
+      #webcam,
+      #hand-canvas {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 4/3;
+      }
+
+      .webcam-header {
+        padding: 4px 10px;
+        font-size: 10px;
+      }
+
+      .webcam-footer {
+        padding: 4px 10px;
+        font-size: 9px;
+      }
+
+      .controls {
+        bottom: 20px;
+        gap: 8px;
+      }
+
+      .controls button {
+        padding: 10px 16px;
+        font-size: 11px;
+        letter-spacing: 1px;
+      }
+
+      .gesture-hints {
+        bottom: 70px;
+        gap: 12px;
+      }
+
+      .gesture-hint {
+        font-size: 8px;
+      }
+
+      .gesture-hint span {
+        font-size: 16px;
+      }
+
+      .photo-overlay img {
+        max-width: 92vw;
+        max-height: 70vh;
+        border-radius: 6px;
+      }
+
+      .start-camera-btn {
+        padding: 8px 14px;
+        font-size: 11px;
+      }
+    }
+
+    /* Very small screens (iPhone SE etc) */
+    @media (max-width: 380px) {
+      .webcam-container {
+        max-width: 240px;
+      }
+
+      .controls button {
+        padding: 8px 12px;
+        font-size: 10px;
+        letter-spacing: 0.5px;
+      }
+
+      .gesture-hints {
+        gap: 8px;
+      }
+    }
+
+    /* Landscape phone */
+    @media (max-height: 500px) {
+      .webcam-container {
+        top: 8px;
+        max-width: 200px;
+        left: 16px;
+        transform: none;
+      }
+
+      .controls {
+        bottom: 12px;
+      }
+
+      .controls button {
+        padding: 8px 14px;
+        font-size: 10px;
+      }
+
+      .gesture-hints {
+        display: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -366,8 +471,9 @@
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x0a0a0a, 0.025);
 
-    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(0, 2, 14);
+    const isMobile = window.innerWidth < 600;
+    const camera = new THREE.PerspectiveCamera(isMobile ? 60 : 50, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 2, isMobile ? 16 : 14);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -383,8 +489,9 @@
     controls.autoRotate = true;
     controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
     controls.enablePan = false;
-    controls.minDistance = 5;
+    controls.minDistance = isMobile ? 8 : 5;
     controls.maxDistance = 25;
+    controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY };
 
     // --- Lighting ---
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -847,8 +954,10 @@
       const btn = document.getElementById('start-camera');
 
       try {
+        const camWidth = Math.min(320, window.innerWidth - 32);
+        const camHeight = Math.round(camWidth * 0.75);
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 320, height: 240, facingMode: 'user' }
+          video: { width: camWidth, height: camHeight, facingMode: 'user' }
         });
         video.srcObject = stream;
         btn.style.display = 'none';
@@ -943,9 +1052,11 @@
 
     animate();
 
-    // --- Resize ---
+    // --- Resize (handles orientation change on mobile) ---
     window.addEventListener('resize', () => {
+      const mobile = window.innerWidth < 600;
       camera.aspect = window.innerWidth / window.innerHeight;
+      camera.fov = mobile ? 60 : 50;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
