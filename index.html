@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Photo Gallery</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0a;
+      overflow: hidden;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      color: #fff;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #canvas-container {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+    }
+
+    canvas { display: block; }
+
+    /* Controls */
+    .controls {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 16px;
+      z-index: 10;
+    }
+
+    .controls button {
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff;
+      padding: 12px 28px;
+      border-radius: 50px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      user-select: none;
+    }
+
+    .controls button:hover {
+      background: rgba(255,255,255,0.16);
+      border-color: rgba(255,255,255,0.3);
+      transform: scale(1.05);
+    }
+
+    .controls button:active {
+      transform: scale(0.97);
+    }
+
+    /* Title overlay */
+    .title-overlay {
+      position: fixed;
+      top: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .title-overlay h1 {
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.6);
+    }
+
+    .title-overlay p {
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      color: rgba(255,255,255,0.3);
+      margin-top: 6px;
+    }
+
+    /* Photo detail overlay */
+    .photo-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    .photo-overlay.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .photo-overlay img {
+      max-width: 80vw;
+      max-height: 80vh;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 20px 80px rgba(0,0,0,0.6);
+    }
+
+    /* Photo count */
+    .photo-count {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      color: rgba(255,255,255,0.3);
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    /* Loading */
+    .loading-screen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 1000;
+      transition: opacity 0.8s ease;
+    }
+
+    .loading-screen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-spinner {
+      width: 32px;
+      height: 32px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-top-color: rgba(255,255,255,0.6);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .loading-text {
+      margin-top: 16px;
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="loading-screen" id="loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading Gallery</div>
+  </div>
+
+  <div class="title-overlay">
+    <h1>Photo Gallery</h1>
+    <p>Drag to rotate &middot; Scroll to zoom &middot; Click a photo to expand</p>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <div class="photo-count" id="photo-count"></div>
+
+  <div class="controls">
+    <button id="btn-shuffle">Shuffle</button>
+    <button id="btn-expand">Expand</button>
+    <button id="btn-collapse">Collapse</button>
+  </div>
+
+  <div class="photo-overlay" id="photo-overlay">
+    <img id="overlay-img" src="" alt="Expanded photo" />
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // --- Configuration ---
+    const PHOTO_COUNT = 35;
+    const SPHERE_RADIUS = 6;
+    const EXPANDED_RADIUS = 12;
+    const PHOTO_WIDTH = 1.4;
+    const PHOTO_HEIGHT = 1.0;
+    const LINE_OPACITY = 0.08;
+    const AUTO_ROTATE_SPEED = 0.3;
+
+    // --- Sample photo URLs (using picsum for variety) ---
+    const photoIds = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                      20, 22, 24, 25, 26, 27, 28, 29, 30, 31,
+                      32, 33, 34, 35, 36, 37, 38, 39, 40, 42,
+                      43, 44, 45, 46, 47];
+
+    function getPhotoUrl(id) {
+      return `https://picsum.photos/id/${id}/400/300`;
+    }
+
+    // --- Scene setup ---
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x0a0a0a, 0.035);
+
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 2, 14);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    // --- Orbit controls ---
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
+    controls.enablePan = false;
+    controls.minDistance = 5;
+    controls.maxDistance = 25;
+
+    // --- Lighting ---
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
+
+    const pointLight1 = new THREE.PointLight(0xffffff, 0.5, 50);
+    pointLight1.position.set(10, 10, 10);
+    scene.add(pointLight1);
+
+    const pointLight2 = new THREE.PointLight(0x8888ff, 0.3, 50);
+    pointLight2.position.set(-10, -5, -10);
+    scene.add(pointLight2);
+
+    // --- Generate sphere positions with slight randomness ---
+    function generateSpherePositions(count, radius) {
+      const positions = [];
+      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+
+      for (let i = 0; i < count; i++) {
+        const y = 1 - (i / (count - 1)) * 2;
+        const radiusAtY = Math.sqrt(1 - y * y);
+        const theta = goldenAngle * i;
+
+        const jitter = 0.3;
+        const x = radiusAtY * Math.cos(theta) * radius + (Math.random() - 0.5) * jitter;
+        const yPos = y * radius + (Math.random() - 0.5) * jitter;
+        const z = radiusAtY * Math.sin(theta) * radius + (Math.random() - 0.5) * jitter;
+
+        positions.push(new THREE.Vector3(x, yPos, z));
+      }
+      return positions;
+    }
+
+    let currentPositions = generateSpherePositions(PHOTO_COUNT, SPHERE_RADIUS);
+    let targetPositions = currentPositions.map(p => p.clone());
+
+    // --- Load textures and create photo meshes ---
+    const textureLoader = new THREE.TextureLoader();
+    const photoMeshes = [];
+    const photoGroup = new THREE.Group();
+    scene.add(photoGroup);
+
+    let loadedCount = 0;
+
+    function onPhotoLoaded() {
+      loadedCount++;
+      if (loadedCount >= PHOTO_COUNT) {
+        setTimeout(() => {
+          document.getElementById('loading').classList.add('fade-out');
+        }, 300);
+      }
+    }
+
+    for (let i = 0; i < PHOTO_COUNT; i++) {
+      const url = getPhotoUrl(photoIds[i % photoIds.length]);
+
+      const geometry = new THREE.PlaneGeometry(PHOTO_WIDTH, PHOTO_HEIGHT);
+
+      // Create a placeholder material first
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x222222,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0,
+        roughness: 0.3,
+        metalness: 0.0,
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(currentPositions[i]);
+
+      // Random tilt for organic feel
+      mesh.rotation.x = (Math.random() - 0.5) * 0.4;
+      mesh.rotation.y = (Math.random() - 0.5) * 0.4;
+      mesh.rotation.z = (Math.random() - 0.5) * 0.15;
+
+      mesh.userData = {
+        index: i,
+        photoUrl: url,
+        baseRotation: mesh.rotation.clone(),
+        hovered: false,
+      };
+
+      photoGroup.add(mesh);
+      photoMeshes.push(mesh);
+
+      // Load texture asynchronously
+      textureLoader.load(url, (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        material.map = texture;
+        material.color.set(0xffffff);
+        material.needsUpdate = true;
+        onPhotoLoaded();
+      }, undefined, () => {
+        // On error, use colored placeholder
+        material.color.set(new THREE.Color().setHSL(Math.random(), 0.4, 0.3));
+        onPhotoLoaded();
+      });
+    }
+
+    // --- Connecting lines (constellation effect) ---
+    const lineGroup = new THREE.Group();
+    scene.add(lineGroup);
+
+    function createLines() {
+      // Remove old lines
+      while (lineGroup.children.length > 0) {
+        const child = lineGroup.children[0];
+        child.geometry.dispose();
+        child.material.dispose();
+        lineGroup.remove(child);
+      }
+
+      const lineMaterial = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: LINE_OPACITY,
+      });
+
+      // Connect each photo to its nearest neighbors
+      for (let i = 0; i < photoMeshes.length; i++) {
+        const distances = [];
+        for (let j = 0; j < photoMeshes.length; j++) {
+          if (i === j) continue;
+          const dist = photoMeshes[i].position.distanceTo(photoMeshes[j].position);
+          distances.push({ index: j, dist });
+        }
+        distances.sort((a, b) => a.dist - b.dist);
+
+        // Connect to 2-3 nearest neighbors
+        const connectCount = 2 + Math.floor(Math.random() * 2);
+        for (let k = 0; k < Math.min(connectCount, distances.length); k++) {
+          const j = distances[k].index;
+          if (j > i) { // Avoid duplicate lines
+            const points = [
+              photoMeshes[i].position.clone(),
+              photoMeshes[j].position.clone(),
+            ];
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geometry, lineMaterial.clone());
+            line.userData = { from: i, to: j };
+            lineGroup.add(line);
+          }
+        }
+      }
+    }
+
+    createLines();
+
+    // --- Update photo count display ---
+    document.getElementById('photo-count').textContent = `${PHOTO_COUNT} PHOTOS`;
+
+    // --- Animation helpers ---
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    function animateToTargets(duration = 1.5) {
+      const startPositions = photoMeshes.map(m => m.position.clone());
+      const startTime = performance.now();
+
+      function step() {
+        const elapsed = (performance.now() - startTime) / 1000;
+        const t = Math.min(elapsed / duration, 1);
+        // Ease out cubic
+        const ease = 1 - Math.pow(1 - t, 3);
+
+        for (let i = 0; i < photoMeshes.length; i++) {
+          photoMeshes[i].position.lerpVectors(startPositions[i], targetPositions[i], ease);
+        }
+
+        // Update lines
+        lineGroup.children.forEach(line => {
+          const { from, to } = line.userData;
+          const positions = line.geometry.attributes.position;
+          positions.setXYZ(0, photoMeshes[from].position.x, photoMeshes[from].position.y, photoMeshes[from].position.z);
+          positions.setXYZ(1, photoMeshes[to].position.x, photoMeshes[to].position.y, photoMeshes[to].position.z);
+          positions.needsUpdate = true;
+        });
+
+        if (t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    // --- Fade in photos ---
+    function fadeInPhotos() {
+      const startTime = performance.now();
+      function step() {
+        const elapsed = (performance.now() - startTime) / 1000;
+        for (let i = 0; i < photoMeshes.length; i++) {
+          const delay = i * 0.04;
+          const t = Math.max(0, Math.min((elapsed - delay) / 0.6, 1));
+          photoMeshes[i].material.opacity = t;
+        }
+        if (elapsed < PHOTO_COUNT * 0.04 + 0.6) {
+          requestAnimationFrame(step);
+        }
+      }
+      requestAnimationFrame(step);
+    }
+
+    // Start fade-in after a brief delay
+    setTimeout(fadeInPhotos, 200);
+
+    // --- Controls: Shuffle ---
+    let isExpanded = false;
+
+    document.getElementById('btn-shuffle').addEventListener('click', () => {
+      const radius = isExpanded ? EXPANDED_RADIUS : SPHERE_RADIUS;
+      targetPositions = generateSpherePositions(PHOTO_COUNT, radius);
+
+      // Also randomize rotations
+      for (let i = 0; i < photoMeshes.length; i++) {
+        photoMeshes[i].userData.baseRotation.set(
+          (Math.random() - 0.5) * 0.4,
+          (Math.random() - 0.5) * 0.4,
+          (Math.random() - 0.5) * 0.15
+        );
+      }
+
+      animateToTargets(1.2);
+      setTimeout(() => {
+        createLines();
+      }, 1300);
+    });
+
+    // --- Controls: Expand ---
+    document.getElementById('btn-expand').addEventListener('click', () => {
+      if (isExpanded) return;
+      isExpanded = true;
+      targetPositions = currentPositions.map(p => p.clone().multiplyScalar(EXPANDED_RADIUS / SPHERE_RADIUS));
+      animateToTargets(1.5);
+      setTimeout(createLines, 1600);
+    });
+
+    // --- Controls: Collapse ---
+    document.getElementById('btn-collapse').addEventListener('click', () => {
+      if (!isExpanded) return;
+      isExpanded = false;
+      targetPositions = generateSpherePositions(PHOTO_COUNT, SPHERE_RADIUS);
+      animateToTargets(1.5);
+      setTimeout(createLines, 1600);
+    });
+
+    // --- Raycasting for click/hover ---
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let hoveredMesh = null;
+
+    function onPointerMove(event) {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    }
+
+    function onPointerClick(event) {
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(photoMeshes);
+
+      if (intersects.length > 0) {
+        const mesh = intersects[0].object;
+        const url = mesh.userData.photoUrl;
+        const overlay = document.getElementById('photo-overlay');
+        const img = document.getElementById('overlay-img');
+        // Use higher res for overlay
+        img.src = url.replace('/400/300', '/800/600');
+        overlay.classList.add('active');
+      }
+    }
+
+    // Close overlay
+    document.getElementById('photo-overlay').addEventListener('click', () => {
+      document.getElementById('photo-overlay').classList.remove('active');
+    });
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('click', onPointerClick);
+
+    // --- Subtle floating animation ---
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const time = clock.getElapsedTime();
+
+      // Gentle floating motion for each photo
+      for (let i = 0; i < photoMeshes.length; i++) {
+        const mesh = photoMeshes[i];
+        const base = mesh.userData.baseRotation;
+        const floatSpeed = 0.3 + i * 0.01;
+        const floatAmp = 0.02;
+
+        mesh.rotation.x = base.x + Math.sin(time * floatSpeed + i) * floatAmp;
+        mesh.rotation.y = base.y + Math.cos(time * floatSpeed * 0.7 + i) * floatAmp;
+
+        // Make photos face camera slightly
+        const lookFactor = 0.15;
+        const toCamera = new THREE.Vector3().subVectors(camera.position, mesh.position).normalize();
+        mesh.rotation.y += toCamera.x * lookFactor;
+        mesh.rotation.x -= toCamera.y * lookFactor;
+      }
+
+      // Hover effect
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(photoMeshes);
+
+      if (hoveredMesh && (!intersects.length || intersects[0].object !== hoveredMesh)) {
+        hoveredMesh.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
+        hoveredMesh = null;
+        renderer.domElement.style.cursor = 'grab';
+      }
+
+      if (intersects.length > 0) {
+        const mesh = intersects[0].object;
+        hoveredMesh = mesh;
+        mesh.scale.lerp(new THREE.Vector3(1.15, 1.15, 1.15), 0.1);
+        renderer.domElement.style.cursor = 'pointer';
+      }
+
+      // Update line positions (in case of floating motion offset)
+      lineGroup.children.forEach(line => {
+        const { from, to } = line.userData;
+        const pos = line.geometry.attributes.position;
+        pos.setXYZ(0, photoMeshes[from].position.x, photoMeshes[from].position.y, photoMeshes[from].position.z);
+        pos.setXYZ(1, photoMeshes[to].position.x, photoMeshes[to].position.y, photoMeshes[to].position.z);
+        pos.needsUpdate = true;
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // --- Resize ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- Keyboard shortcuts ---
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 's' || e.key === 'S') document.getElementById('btn-shuffle').click();
+      if (e.key === 'e' || e.key === 'E') document.getElementById('btn-expand').click();
+      if (e.key === 'c' || e.key === 'C') document.getElementById('btn-collapse').click();
+      if (e.key === 'Escape') document.getElementById('photo-overlay').classList.remove('active');
+    });
+  </script>
+</body>
+</html>
