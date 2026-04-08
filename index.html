@@ -277,9 +277,12 @@
     /* ========== MOBILE RESPONSIVE ========== */
     @media (max-width: 600px) {
       .webcam-container {
-        width: calc(100vw - 32px);
-        max-width: 280px;
+        width: 140px;
         top: 12px;
+        left: auto;
+        right: 12px;
+        transform: none;
+        border-radius: 10px;
       }
 
       .webcam-video-wrap,
@@ -291,14 +294,19 @@
       }
 
       .webcam-header {
-        padding: 4px 10px;
-        font-size: 10px;
+        padding: 3px 8px;
+        font-size: 8px;
       }
 
+      .webcam-header .dot { width: 5px; height: 5px; }
+
       .webcam-footer {
-        padding: 4px 10px;
-        font-size: 9px;
+        padding: 3px 8px;
+        font-size: 8px;
       }
+
+      .gesture-label { font-size: 8px; }
+      .gesture-dot { width: 6px; height: 6px; }
 
       .controls {
         bottom: 20px;
@@ -313,7 +321,7 @@
 
       .gesture-hints {
         bottom: 70px;
-        gap: 12px;
+        gap: 10px;
       }
 
       .gesture-hint {
@@ -331,15 +339,15 @@
       }
 
       .start-camera-btn {
-        padding: 8px 14px;
-        font-size: 11px;
+        padding: 6px 10px;
+        font-size: 9px;
       }
     }
 
     /* Very small screens (iPhone SE etc) */
     @media (max-width: 380px) {
       .webcam-container {
-        max-width: 240px;
+        width: 120px;
       }
 
       .controls button {
@@ -357,8 +365,9 @@
     @media (max-height: 500px) {
       .webcam-container {
         top: 8px;
-        max-width: 200px;
-        left: 16px;
+        width: 160px;
+        left: auto;
+        right: 12px;
         transform: none;
       }
 
@@ -948,21 +957,18 @@
       }
     }
 
-    // --- Start camera ---
-    document.getElementById('start-camera').addEventListener('click', async () => {
+    // --- Start camera (auto-start on load, with button fallback) ---
+    async function startCamera() {
       const video = document.getElementById('webcam');
       const btn = document.getElementById('start-camera');
 
       try {
-        const camWidth = Math.min(320, window.innerWidth - 32);
-        const camHeight = Math.round(camWidth * 0.75);
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: camWidth, height: camHeight, facingMode: 'user' }
+          video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' }
         });
         video.srcObject = stream;
         btn.style.display = 'none';
 
-        // Initialize MediaPipe Hands
         const hands = new Hands({
           locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`
         });
@@ -976,7 +982,6 @@
 
         hands.onResults(onHandResults);
 
-        // Use MediaPipe camera utility for frame processing
         const mpCamera = new Camera(video, {
           onFrame: async () => {
             await hands.send({ image: video });
@@ -989,11 +994,16 @@
         document.getElementById('gesture-mode-label').textContent = 'HANDS';
       } catch (err) {
         console.warn('Camera not available:', err);
-        btn.textContent = 'Camera unavailable';
-        btn.style.opacity = '0.5';
-        btn.style.cursor = 'default';
+        btn.textContent = 'Tap to enable camera';
+        btn.style.display = 'block';
       }
-    });
+    }
+
+    // Auto-start camera when page loads
+    startCamera();
+
+    // Fallback: button click retries camera access
+    document.getElementById('start-camera').addEventListener('click', startCamera);
 
     // ============================================================
     // MAIN ANIMATION LOOP
