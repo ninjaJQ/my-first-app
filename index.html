@@ -24,6 +24,114 @@
 
     canvas { display: block; }
 
+    /* Webcam preview - like the reference video */
+    .webcam-container {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.1);
+      background: #111;
+      width: 320px;
+    }
+
+    .webcam-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: rgba(30,30,30,0.95);
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.5px;
+    }
+
+    .webcam-header .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+    .webcam-header .dot-red { background: #ff5f57; }
+    .webcam-header .dot-yellow { background: #ffbd2e; }
+    .webcam-header .dot-green { background: #28c840; }
+
+    .webcam-video-wrap {
+      position: relative;
+      width: 320px;
+      height: 240px;
+    }
+
+    #webcam {
+      width: 320px;
+      height: 240px;
+      object-fit: cover;
+      transform: scaleX(-1);
+      display: block;
+    }
+
+    #hand-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 320px;
+      height: 240px;
+      pointer-events: none;
+      transform: scaleX(-1);
+    }
+
+    .webcam-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: rgba(30,30,30,0.95);
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    .gesture-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .gesture-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #333;
+      transition: background 0.2s;
+    }
+
+    .gesture-dot.active { background: #ff4444; }
+
+    .gesture-label {
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      transition: color 0.2s;
+    }
+
+    .gesture-label.active { color: #fff; }
+
+    /* Start camera button */
+    .start-camera-btn {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 12px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      z-index: 5;
+      transition: background 0.2s;
+    }
+
+    .start-camera-btn:hover { background: rgba(255,255,255,0.2); }
+
     /* Controls */
     .controls {
       position: fixed;
@@ -62,30 +170,35 @@
       transform: scale(0.97);
     }
 
-    /* Title overlay */
-    .title-overlay {
+    .controls button.active-gesture {
+      background: rgba(255,100,100,0.25);
+      border-color: rgba(255,100,100,0.5);
+    }
+
+    /* Gesture hint */
+    .gesture-hints {
       position: fixed;
-      top: 32px;
+      bottom: 90px;
       left: 50%;
       transform: translateX(-50%);
-      text-align: center;
+      display: flex;
+      gap: 24px;
       z-index: 10;
       pointer-events: none;
     }
 
-    .title-overlay h1 {
-      font-size: 14px;
-      font-weight: 500;
-      letter-spacing: 3px;
+    .gesture-hint {
+      font-size: 10px;
+      letter-spacing: 1px;
       text-transform: uppercase;
-      color: rgba(255,255,255,0.6);
+      color: rgba(255,255,255,0.25);
+      text-align: center;
     }
 
-    .title-overlay p {
-      font-size: 11px;
-      letter-spacing: 1.5px;
-      color: rgba(255,255,255,0.3);
-      margin-top: 6px;
+    .gesture-hint span {
+      display: block;
+      font-size: 20px;
+      margin-bottom: 4px;
     }
 
     /* Photo detail overlay */
@@ -116,19 +229,6 @@
       object-fit: contain;
       border-radius: 8px;
       box-shadow: 0 20px 80px rgba(0,0,0,0.6);
-    }
-
-    /* Photo count */
-    .photo-count {
-      position: fixed;
-      bottom: 90px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 11px;
-      letter-spacing: 1.5px;
-      color: rgba(255,255,255,0.3);
-      z-index: 10;
-      pointer-events: none;
     }
 
     /* Loading */
@@ -179,14 +279,39 @@
     <div class="loading-text">Loading Gallery</div>
   </div>
 
-  <div class="title-overlay">
-    <h1>Photo Gallery</h1>
-    <p>Drag to rotate &middot; Scroll to zoom &middot; Click a photo to expand</p>
+  <!-- Webcam preview window (like the reference video) -->
+  <div class="webcam-container" id="webcam-container">
+    <div class="webcam-header">
+      <div>
+        <span class="dot dot-red"></span>
+        <span class="dot dot-yellow"></span>
+        <span class="dot dot-green"></span>
+      </div>
+      <span>Photo Booth</span>
+      <span id="gesture-mode-label">MOUSE</span>
+    </div>
+    <div class="webcam-video-wrap">
+      <video id="webcam" autoplay playsinline></video>
+      <canvas id="hand-canvas" width="320" height="240"></canvas>
+      <button class="start-camera-btn" id="start-camera">Enable Camera</button>
+    </div>
+    <div class="webcam-footer">
+      <div class="gesture-indicator">
+        <div class="gesture-dot" id="gesture-dot"></div>
+        <span class="gesture-label" id="gesture-name">No gesture</span>
+      </div>
+      <span id="photo-count-label">35 Photos</span>
+    </div>
   </div>
 
   <div id="canvas-container"></div>
 
-  <div class="photo-count" id="photo-count"></div>
+  <div class="gesture-hints">
+    <div class="gesture-hint"><span>&#9994;</span>Pinch &amp; drag<br/>to rotate</div>
+    <div class="gesture-hint"><span>&#9995;</span>Open palm<br/>to expand</div>
+    <div class="gesture-hint"><span>&#9996;</span>Peace sign<br/>to shuffle</div>
+    <div class="gesture-hint"><span>&#128072;</span>Point<br/>to select</div>
+  </div>
 
   <div class="controls">
     <button id="btn-shuffle">Shuffle</button>
@@ -197,6 +322,11 @@
   <div class="photo-overlay" id="photo-overlay">
     <img id="overlay-img" src="" alt="Expanded photo" />
   </div>
+
+  <!-- MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.min.js" crossorigin="anonymous"></script>
 
   <script type="importmap">
   {
@@ -217,10 +347,10 @@
     const EXPANDED_RADIUS = 12;
     const PHOTO_WIDTH = 1.4;
     const PHOTO_HEIGHT = 1.0;
-    const LINE_OPACITY = 0.08;
+    const LINE_OPACITY = 0.15;
     const AUTO_ROTATE_SPEED = 0.3;
 
-    // --- Sample photo URLs (using picsum for variety) ---
+    // --- Sample photo URLs ---
     const photoIds = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
                       20, 22, 24, 25, 26, 27, 28, 29, 30, 31,
                       32, 33, 34, 35, 36, 37, 38, 39, 40, 42,
@@ -230,9 +360,11 @@
       return `https://picsum.photos/id/${id}/400/300`;
     }
 
-    // --- Scene setup ---
+    // ============================================================
+    // THREE.JS SCENE SETUP
+    // ============================================================
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x0a0a0a, 0.035);
+    scene.fog = new THREE.FogExp2(0x0a0a0a, 0.025);
 
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
     camera.position.set(0, 2, 14);
@@ -244,7 +376,7 @@
     renderer.toneMappingExposure = 1.2;
     document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-    // --- Orbit controls ---
+    // --- Orbit controls (still work as fallback for mouse) ---
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
@@ -257,31 +389,29 @@
     // --- Lighting ---
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambientLight);
-
     const pointLight1 = new THREE.PointLight(0xffffff, 0.5, 50);
     pointLight1.position.set(10, 10, 10);
     scene.add(pointLight1);
-
     const pointLight2 = new THREE.PointLight(0x8888ff, 0.3, 50);
     pointLight2.position.set(-10, -5, -10);
     scene.add(pointLight2);
 
-    // --- Generate sphere positions with slight randomness ---
+    // ============================================================
+    // SPHERE POSITIONS
+    // ============================================================
     function generateSpherePositions(count, radius) {
       const positions = [];
       const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-
       for (let i = 0; i < count; i++) {
         const y = 1 - (i / (count - 1)) * 2;
         const radiusAtY = Math.sqrt(1 - y * y);
         const theta = goldenAngle * i;
-
         const jitter = 0.3;
-        const x = radiusAtY * Math.cos(theta) * radius + (Math.random() - 0.5) * jitter;
-        const yPos = y * radius + (Math.random() - 0.5) * jitter;
-        const z = radiusAtY * Math.sin(theta) * radius + (Math.random() - 0.5) * jitter;
-
-        positions.push(new THREE.Vector3(x, yPos, z));
+        positions.push(new THREE.Vector3(
+          radiusAtY * Math.cos(theta) * radius + (Math.random() - 0.5) * jitter,
+          y * radius + (Math.random() - 0.5) * jitter,
+          radiusAtY * Math.sin(theta) * radius + (Math.random() - 0.5) * jitter
+        ));
       }
       return positions;
     }
@@ -289,29 +419,25 @@
     let currentPositions = generateSpherePositions(PHOTO_COUNT, SPHERE_RADIUS);
     let targetPositions = currentPositions.map(p => p.clone());
 
-    // --- Load textures and create photo meshes ---
+    // ============================================================
+    // PHOTO MESHES
+    // ============================================================
     const textureLoader = new THREE.TextureLoader();
     const photoMeshes = [];
     const photoGroup = new THREE.Group();
     scene.add(photoGroup);
 
     let loadedCount = 0;
-
     function onPhotoLoaded() {
       loadedCount++;
       if (loadedCount >= PHOTO_COUNT) {
-        setTimeout(() => {
-          document.getElementById('loading').classList.add('fade-out');
-        }, 300);
+        setTimeout(() => document.getElementById('loading').classList.add('fade-out'), 300);
       }
     }
 
     for (let i = 0; i < PHOTO_COUNT; i++) {
       const url = getPhotoUrl(photoIds[i % photoIds.length]);
-
       const geometry = new THREE.PlaneGeometry(PHOTO_WIDTH, PHOTO_HEIGHT);
-
-      // Create a placeholder material first
       const material = new THREE.MeshStandardMaterial({
         color: 0x222222,
         side: THREE.DoubleSide,
@@ -319,12 +445,13 @@
         opacity: 0,
         roughness: 0.3,
         metalness: 0.0,
+        depthWrite: true,
       });
 
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.copy(currentPositions[i]);
+      mesh.renderOrder = 0;
 
-      // Random tilt for organic feel
       mesh.rotation.x = (Math.random() - 0.5) * 0.4;
       mesh.rotation.y = (Math.random() - 0.5) * 0.4;
       mesh.rotation.z = (Math.random() - 0.5) * 0.15;
@@ -333,13 +460,11 @@
         index: i,
         photoUrl: url,
         baseRotation: mesh.rotation.clone(),
-        hovered: false,
       };
 
       photoGroup.add(mesh);
       photoMeshes.push(mesh);
 
-      // Load texture asynchronously
       textureLoader.load(url, (texture) => {
         texture.colorSpace = THREE.SRGBColorSpace;
         material.map = texture;
@@ -347,18 +472,19 @@
         material.needsUpdate = true;
         onPhotoLoaded();
       }, undefined, () => {
-        // On error, use colored placeholder
         material.color.set(new THREE.Color().setHSL(Math.random(), 0.4, 0.3));
         onPhotoLoaded();
       });
     }
 
-    // --- Connecting lines (constellation effect) ---
+    // ============================================================
+    // CONNECTING LINES - rendered ON TOP of photos
+    // ============================================================
     const lineGroup = new THREE.Group();
+    lineGroup.renderOrder = 1; // render after photos
     scene.add(lineGroup);
 
     function createLines() {
-      // Remove old lines
       while (lineGroup.children.length > 0) {
         const child = lineGroup.children[0];
         child.geometry.dispose();
@@ -366,33 +492,31 @@
         lineGroup.remove(child);
       }
 
+      // Lines render on top with depthTest disabled so they cross over photos
       const lineMaterial = new THREE.LineBasicMaterial({
         color: 0xffffff,
         transparent: true,
         opacity: LINE_OPACITY,
+        depthTest: false,
+        depthWrite: false,
       });
 
-      // Connect each photo to its nearest neighbors
       for (let i = 0; i < photoMeshes.length; i++) {
         const distances = [];
         for (let j = 0; j < photoMeshes.length; j++) {
           if (i === j) continue;
-          const dist = photoMeshes[i].position.distanceTo(photoMeshes[j].position);
-          distances.push({ index: j, dist });
+          distances.push({ index: j, dist: photoMeshes[i].position.distanceTo(photoMeshes[j].position) });
         }
         distances.sort((a, b) => a.dist - b.dist);
 
-        // Connect to 2-3 nearest neighbors
         const connectCount = 2 + Math.floor(Math.random() * 2);
         for (let k = 0; k < Math.min(connectCount, distances.length); k++) {
           const j = distances[k].index;
-          if (j > i) { // Avoid duplicate lines
-            const points = [
-              photoMeshes[i].position.clone(),
-              photoMeshes[j].position.clone(),
-            ];
+          if (j > i) {
+            const points = [photoMeshes[i].position.clone(), photoMeshes[j].position.clone()];
             const geometry = new THREE.BufferGeometry().setFromPoints(points);
             const line = new THREE.Line(geometry, lineMaterial.clone());
+            line.renderOrder = 1;
             line.userData = { from: i, to: j };
             lineGroup.add(line);
           }
@@ -402,68 +526,58 @@
 
     createLines();
 
-    // --- Update photo count display ---
-    document.getElementById('photo-count').textContent = `${PHOTO_COUNT} PHOTOS`;
-
-    // --- Animation helpers ---
-    function lerp(a, b, t) { return a + (b - a) * t; }
-
+    // ============================================================
+    // ANIMATION HELPERS
+    // ============================================================
     function animateToTargets(duration = 1.5) {
       const startPositions = photoMeshes.map(m => m.position.clone());
       const startTime = performance.now();
-
       function step() {
         const elapsed = (performance.now() - startTime) / 1000;
         const t = Math.min(elapsed / duration, 1);
-        // Ease out cubic
         const ease = 1 - Math.pow(1 - t, 3);
-
         for (let i = 0; i < photoMeshes.length; i++) {
           photoMeshes[i].position.lerpVectors(startPositions[i], targetPositions[i], ease);
         }
-
-        // Update lines
-        lineGroup.children.forEach(line => {
-          const { from, to } = line.userData;
-          const positions = line.geometry.attributes.position;
-          positions.setXYZ(0, photoMeshes[from].position.x, photoMeshes[from].position.y, photoMeshes[from].position.z);
-          positions.setXYZ(1, photoMeshes[to].position.x, photoMeshes[to].position.y, photoMeshes[to].position.z);
-          positions.needsUpdate = true;
-        });
-
+        updateLinePositions();
         if (t < 1) requestAnimationFrame(step);
       }
       requestAnimationFrame(step);
     }
 
-    // --- Fade in photos ---
+    function updateLinePositions() {
+      lineGroup.children.forEach(line => {
+        const { from, to } = line.userData;
+        const pos = line.geometry.attributes.position;
+        pos.setXYZ(0, photoMeshes[from].position.x, photoMeshes[from].position.y, photoMeshes[from].position.z);
+        pos.setXYZ(1, photoMeshes[to].position.x, photoMeshes[to].position.y, photoMeshes[to].position.z);
+        pos.needsUpdate = true;
+      });
+    }
+
+    // Fade in photos
     function fadeInPhotos() {
       const startTime = performance.now();
       function step() {
         const elapsed = (performance.now() - startTime) / 1000;
         for (let i = 0; i < photoMeshes.length; i++) {
           const delay = i * 0.04;
-          const t = Math.max(0, Math.min((elapsed - delay) / 0.6, 1));
-          photoMeshes[i].material.opacity = t;
+          photoMeshes[i].material.opacity = Math.max(0, Math.min((elapsed - delay) / 0.6, 1));
         }
-        if (elapsed < PHOTO_COUNT * 0.04 + 0.6) {
-          requestAnimationFrame(step);
-        }
+        if (elapsed < PHOTO_COUNT * 0.04 + 0.6) requestAnimationFrame(step);
       }
       requestAnimationFrame(step);
     }
-
-    // Start fade-in after a brief delay
     setTimeout(fadeInPhotos, 200);
 
-    // --- Controls: Shuffle ---
+    // ============================================================
+    // BUTTON CONTROLS
+    // ============================================================
     let isExpanded = false;
 
-    document.getElementById('btn-shuffle').addEventListener('click', () => {
+    function doShuffle() {
       const radius = isExpanded ? EXPANDED_RADIUS : SPHERE_RADIUS;
       targetPositions = generateSpherePositions(PHOTO_COUNT, radius);
-
-      // Also randomize rotations
       for (let i = 0; i < photoMeshes.length; i++) {
         photoMeshes[i].userData.baseRotation.set(
           (Math.random() - 0.5) * 0.4,
@@ -471,34 +585,35 @@
           (Math.random() - 0.5) * 0.15
         );
       }
-
       animateToTargets(1.2);
-      setTimeout(() => {
-        createLines();
-      }, 1300);
-    });
+      setTimeout(createLines, 1300);
+    }
 
-    // --- Controls: Expand ---
-    document.getElementById('btn-expand').addEventListener('click', () => {
+    function doExpand() {
       if (isExpanded) return;
       isExpanded = true;
       targetPositions = currentPositions.map(p => p.clone().multiplyScalar(EXPANDED_RADIUS / SPHERE_RADIUS));
       animateToTargets(1.5);
       setTimeout(createLines, 1600);
-    });
+    }
 
-    // --- Controls: Collapse ---
-    document.getElementById('btn-collapse').addEventListener('click', () => {
+    function doCollapse() {
       if (!isExpanded) return;
       isExpanded = false;
       targetPositions = generateSpherePositions(PHOTO_COUNT, SPHERE_RADIUS);
       animateToTargets(1.5);
       setTimeout(createLines, 1600);
-    });
+    }
 
-    // --- Raycasting for click/hover ---
+    document.getElementById('btn-shuffle').addEventListener('click', doShuffle);
+    document.getElementById('btn-expand').addEventListener('click', doExpand);
+    document.getElementById('btn-collapse').addEventListener('click', doCollapse);
+
+    // ============================================================
+    // RAYCASTING (mouse fallback + gesture pointer)
+    // ============================================================
     const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
+    const mouse = new THREE.Vector2(9999, 9999);
     let hoveredMesh = null;
 
     function onPointerMove(event) {
@@ -506,22 +621,17 @@
       mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     }
 
-    function onPointerClick(event) {
+    function onPointerClick() {
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(photoMeshes);
-
       if (intersects.length > 0) {
         const mesh = intersects[0].object;
-        const url = mesh.userData.photoUrl;
         const overlay = document.getElementById('photo-overlay');
-        const img = document.getElementById('overlay-img');
-        // Use higher res for overlay
-        img.src = url.replace('/400/300', '/800/600');
+        document.getElementById('overlay-img').src = mesh.userData.photoUrl.replace('/400/300', '/800/600');
         overlay.classList.add('active');
       }
     }
 
-    // Close overlay
     document.getElementById('photo-overlay').addEventListener('click', () => {
       document.getElementById('photo-overlay').classList.remove('active');
     });
@@ -529,15 +639,273 @@
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('click', onPointerClick);
 
-    // --- Subtle floating animation ---
+    // ============================================================
+    // HAND GESTURE TRACKING (MediaPipe Hands)
+    // ============================================================
+    let handActive = false;
+    let currentGesture = 'none';
+    let gestureSmoothed = { x: 0, y: 0 };
+    let prevPinchPos = null;
+    let pinchRotationX = 0;
+    let pinchRotationY = 0;
+    let gestureCooldown = 0;
+
+    // Landmark indices
+    const WRIST = 0;
+    const THUMB_TIP = 4;
+    const INDEX_TIP = 8;
+    const INDEX_MCP = 5;
+    const MIDDLE_TIP = 12;
+    const MIDDLE_MCP = 9;
+    const RING_TIP = 16;
+    const RING_MCP = 13;
+    const PINKY_TIP = 20;
+    const PINKY_MCP = 17;
+
+    function distance2D(a, b) {
+      return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+    }
+
+    function isFingerExtended(landmarks, tip, mcp) {
+      return landmarks[tip].y < landmarks[mcp].y - 0.02;
+    }
+
+    function detectGesture(landmarks) {
+      const thumbIndex = distance2D(landmarks[THUMB_TIP], landmarks[INDEX_TIP]);
+      const indexUp = isFingerExtended(landmarks, INDEX_TIP, INDEX_MCP);
+      const middleUp = isFingerExtended(landmarks, MIDDLE_TIP, MIDDLE_MCP);
+      const ringUp = isFingerExtended(landmarks, RING_TIP, RING_MCP);
+      const pinkyUp = isFingerExtended(landmarks, PINKY_TIP, PINKY_MCP);
+
+      // Pinch: thumb and index close together
+      if (thumbIndex < 0.06) {
+        return 'pinch';
+      }
+
+      // Point: only index finger up
+      if (indexUp && !middleUp && !ringUp && !pinkyUp) {
+        return 'point';
+      }
+
+      // Peace / V sign: index + middle up, ring + pinky down
+      if (indexUp && middleUp && !ringUp && !pinkyUp) {
+        return 'peace';
+      }
+
+      // Open palm: all fingers extended
+      if (indexUp && middleUp && ringUp && pinkyUp) {
+        return 'palm';
+      }
+
+      return 'none';
+    }
+
+    const handCanvasCtx = document.getElementById('hand-canvas').getContext('2d');
+
+    function onHandResults(results) {
+      // Draw hand landmarks on the overlay canvas
+      handCanvasCtx.clearRect(0, 0, 320, 240);
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        handActive = true;
+
+        // Draw hand skeleton
+        if (window.drawConnectors && window.drawLandmarks) {
+          drawConnectors(handCanvasCtx, landmarks, HAND_CONNECTIONS, { color: 'rgba(255,255,255,0.4)', lineWidth: 1 });
+          drawLandmarks(handCanvasCtx, landmarks, { color: 'rgba(255,100,100,0.8)', lineWidth: 1, radius: 2 });
+        }
+
+        const gesture = detectGesture(landmarks);
+        currentGesture = gesture;
+
+        // Smooth hand center position
+        const handX = landmarks[WRIST].x;
+        const handY = landmarks[WRIST].y;
+        gestureSmoothed.x += (handX - gestureSmoothed.x) * 0.3;
+        gestureSmoothed.y += (handY - gestureSmoothed.y) * 0.3;
+
+        // Update UI
+        const gestureDot = document.getElementById('gesture-dot');
+        const gestureName = document.getElementById('gesture-name');
+        const modeLabel = document.getElementById('gesture-mode-label');
+        gestureDot.classList.add('active');
+        modeLabel.textContent = 'HANDS';
+
+        // Cooldown to prevent rapid re-triggers
+        if (gestureCooldown > 0) {
+          gestureCooldown--;
+        }
+
+        switch (gesture) {
+          case 'pinch': {
+            gestureName.textContent = 'Pinch - Rotate';
+            gestureName.classList.add('active');
+
+            // Use pinch position to rotate the scene
+            const px = landmarks[THUMB_TIP].x;
+            const py = landmarks[THUMB_TIP].y;
+
+            if (prevPinchPos) {
+              const dx = (px - prevPinchPos.x) * 8;
+              const dy = (py - prevPinchPos.y) * 8;
+              pinchRotationY += dx;
+              pinchRotationX += dy;
+            }
+            prevPinchPos = { x: px, y: py };
+
+            // Override orbit auto-rotate while pinching
+            controls.autoRotate = false;
+            break;
+          }
+
+          case 'point': {
+            gestureName.textContent = 'Point - Select';
+            gestureName.classList.add('active');
+            prevPinchPos = null;
+            controls.autoRotate = true;
+
+            // Map index finger tip to screen coordinates for raycasting
+            const screenX = (1 - landmarks[INDEX_TIP].x) * 2 - 1; // mirrored
+            const screenY = landmarks[INDEX_TIP].y * 2 - 1;
+            mouse.x = screenX;
+            mouse.y = -screenY;
+
+            // Auto-click if pointing steadily
+            if (gestureCooldown <= 0) {
+              raycaster.setFromCamera(mouse, camera);
+              const intersects = raycaster.intersectObjects(photoMeshes);
+              if (intersects.length > 0) {
+                const mesh = intersects[0].object;
+                document.getElementById('overlay-img').src = mesh.userData.photoUrl.replace('/400/300', '/800/600');
+                document.getElementById('photo-overlay').classList.add('active');
+                gestureCooldown = 30; // ~1 second cooldown
+              }
+            }
+            break;
+          }
+
+          case 'peace': {
+            gestureName.textContent = 'Peace - Shuffle';
+            gestureName.classList.add('active');
+            prevPinchPos = null;
+            controls.autoRotate = true;
+            if (gestureCooldown <= 0) {
+              doShuffle();
+              gestureCooldown = 60; // ~2 second cooldown
+            }
+            break;
+          }
+
+          case 'palm': {
+            gestureName.textContent = 'Palm - Expand';
+            gestureName.classList.add('active');
+            prevPinchPos = null;
+            controls.autoRotate = true;
+            if (gestureCooldown <= 0) {
+              if (isExpanded) {
+                doCollapse();
+              } else {
+                doExpand();
+              }
+              gestureCooldown = 60;
+            }
+            break;
+          }
+
+          default: {
+            gestureName.textContent = 'Tracking...';
+            gestureName.classList.remove('active');
+            prevPinchPos = null;
+            controls.autoRotate = true;
+          }
+        }
+
+        // Highlight active button
+        document.getElementById('btn-shuffle').classList.toggle('active-gesture', gesture === 'peace');
+        document.getElementById('btn-expand').classList.toggle('active-gesture', gesture === 'palm' && !isExpanded);
+        document.getElementById('btn-collapse').classList.toggle('active-gesture', gesture === 'palm' && isExpanded);
+
+      } else {
+        handActive = false;
+        currentGesture = 'none';
+        prevPinchPos = null;
+        controls.autoRotate = true;
+
+        document.getElementById('gesture-dot').classList.remove('active');
+        document.getElementById('gesture-name').textContent = 'No hand detected';
+        document.getElementById('gesture-name').classList.remove('active');
+        document.getElementById('btn-shuffle').classList.remove('active-gesture');
+        document.getElementById('btn-expand').classList.remove('active-gesture');
+        document.getElementById('btn-collapse').classList.remove('active-gesture');
+      }
+    }
+
+    // --- Start camera ---
+    document.getElementById('start-camera').addEventListener('click', async () => {
+      const video = document.getElementById('webcam');
+      const btn = document.getElementById('start-camera');
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 320, height: 240, facingMode: 'user' }
+        });
+        video.srcObject = stream;
+        btn.style.display = 'none';
+
+        // Initialize MediaPipe Hands
+        const hands = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`
+        });
+
+        hands.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.7,
+          minTrackingConfidence: 0.5,
+        });
+
+        hands.onResults(onHandResults);
+
+        // Use MediaPipe camera utility for frame processing
+        const mpCamera = new Camera(video, {
+          onFrame: async () => {
+            await hands.send({ image: video });
+          },
+          width: 320,
+          height: 240,
+        });
+        mpCamera.start();
+
+        document.getElementById('gesture-mode-label').textContent = 'HANDS';
+      } catch (err) {
+        console.warn('Camera not available:', err);
+        btn.textContent = 'Camera unavailable';
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'default';
+      }
+    });
+
+    // ============================================================
+    // MAIN ANIMATION LOOP
+    // ============================================================
     const clock = new THREE.Clock();
 
     function animate() {
       requestAnimationFrame(animate);
-
       const time = clock.getElapsedTime();
 
-      // Gentle floating motion for each photo
+      // Apply hand-gesture rotation to the photo group
+      if (handActive && currentGesture === 'pinch') {
+        photoGroup.rotation.y += (pinchRotationY - photoGroup.rotation.y) * 0.08;
+        photoGroup.rotation.x += (pinchRotationX - photoGroup.rotation.x) * 0.08;
+      } else {
+        // Slowly return pinch rotation tracking to current group rotation
+        pinchRotationY = photoGroup.rotation.y;
+        pinchRotationX = photoGroup.rotation.x;
+      }
+
+      // Gentle floating motion
       for (let i = 0; i < photoMeshes.length; i++) {
         const mesh = photoMeshes[i];
         const base = mesh.userData.baseRotation;
@@ -547,14 +915,13 @@
         mesh.rotation.x = base.x + Math.sin(time * floatSpeed + i) * floatAmp;
         mesh.rotation.y = base.y + Math.cos(time * floatSpeed * 0.7 + i) * floatAmp;
 
-        // Make photos face camera slightly
         const lookFactor = 0.15;
         const toCamera = new THREE.Vector3().subVectors(camera.position, mesh.position).normalize();
         mesh.rotation.y += toCamera.x * lookFactor;
         mesh.rotation.x -= toCamera.y * lookFactor;
       }
 
-      // Hover effect
+      // Hover effect (for both mouse and gesture pointer)
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(photoMeshes);
 
@@ -563,23 +930,13 @@
         hoveredMesh = null;
         renderer.domElement.style.cursor = 'grab';
       }
-
       if (intersects.length > 0) {
-        const mesh = intersects[0].object;
-        hoveredMesh = mesh;
-        mesh.scale.lerp(new THREE.Vector3(1.15, 1.15, 1.15), 0.1);
+        hoveredMesh = intersects[0].object;
+        hoveredMesh.scale.lerp(new THREE.Vector3(1.15, 1.15, 1.15), 0.1);
         renderer.domElement.style.cursor = 'pointer';
       }
 
-      // Update line positions (in case of floating motion offset)
-      lineGroup.children.forEach(line => {
-        const { from, to } = line.userData;
-        const pos = line.geometry.attributes.position;
-        pos.setXYZ(0, photoMeshes[from].position.x, photoMeshes[from].position.y, photoMeshes[from].position.z);
-        pos.setXYZ(1, photoMeshes[to].position.x, photoMeshes[to].position.y, photoMeshes[to].position.z);
-        pos.needsUpdate = true;
-      });
-
+      updateLinePositions();
       controls.update();
       renderer.render(scene, camera);
     }
@@ -595,9 +952,9 @@
 
     // --- Keyboard shortcuts ---
     window.addEventListener('keydown', (e) => {
-      if (e.key === 's' || e.key === 'S') document.getElementById('btn-shuffle').click();
-      if (e.key === 'e' || e.key === 'E') document.getElementById('btn-expand').click();
-      if (e.key === 'c' || e.key === 'C') document.getElementById('btn-collapse').click();
+      if (e.key === 's' || e.key === 'S') doShuffle();
+      if (e.key === 'e' || e.key === 'E') doExpand();
+      if (e.key === 'c' || e.key === 'C') doCollapse();
       if (e.key === 'Escape') document.getElementById('photo-overlay').classList.remove('active');
     });
   </script>
