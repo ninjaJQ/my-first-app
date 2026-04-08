@@ -421,10 +421,12 @@
   <div id="canvas-container"></div>
 
   <div class="gesture-hints">
-    <div class="gesture-hint"><span>&#9994;</span>Pinch &amp; drag<br/>to rotate</div>
-    <div class="gesture-hint"><span>&#9995;</span>Open palm<br/>to expand</div>
-    <div class="gesture-hint"><span>&#9996;</span>Peace sign<br/>to shuffle</div>
-    <div class="gesture-hint"><span>&#128072;</span>Point<br/>to select</div>
+    <div class="gesture-hint"><span>&#9994;</span>Pinch<br/>rotate</div>
+    <div class="gesture-hint"><span>&#128077;</span>Thumbs up<br/>zoom in</div>
+    <div class="gesture-hint"><span>&#128078;</span>Thumbs down<br/>zoom out</div>
+    <div class="gesture-hint"><span>&#9995;</span>Palm<br/>expand</div>
+    <div class="gesture-hint"><span>&#9996;</span>Peace<br/>shuffle</div>
+    <div class="gesture-hint"><span>&#128072;</span>Point<br/>select</div>
   </div>
 
   <div class="controls">
@@ -765,6 +767,7 @@
     let pinchRotationX = 0;
     let pinchRotationY = 0;
     let gestureCooldown = 0;
+    let targetZoom = 14; // matches initial camera z
 
     // Landmark indices
     const WRIST = 0;
@@ -793,9 +796,24 @@
       const ringUp = isFingerExtended(landmarks, RING_TIP, RING_MCP);
       const pinkyUp = isFingerExtended(landmarks, PINKY_TIP, PINKY_MCP);
 
+      // Thumb orientation detection
+      const thumbUp = landmarks[THUMB_TIP].y < landmarks[WRIST].y - 0.08;
+      const thumbDown = landmarks[THUMB_TIP].y > landmarks[WRIST].y + 0.05;
+      const fingersCurled = !indexUp && !middleUp && !ringUp && !pinkyUp;
+
       // Pinch: thumb and index close together
       if (thumbIndex < 0.06) {
         return 'pinch';
+      }
+
+      // Thumbs up: thumb pointing up, all other fingers curled
+      if (thumbUp && fingersCurled) {
+        return 'thumbs_up';
+      }
+
+      // Thumbs down: thumb pointing down, all other fingers curled
+      if (thumbDown && fingersCurled) {
+        return 'thumbs_down';
       }
 
       // Point: only index finger up
@@ -929,6 +947,26 @@
             break;
           }
 
+          case 'thumbs_up': {
+            gestureName.textContent = 'Thumbs Up - Zoom In';
+            gestureName.classList.add('active');
+            prevPinchPos = null;
+            controls.autoRotate = true;
+            // Continuously zoom in while gesture is held
+            targetZoom = Math.max(controls.minDistance, targetZoom - 0.15);
+            break;
+          }
+
+          case 'thumbs_down': {
+            gestureName.textContent = 'Thumbs Down - Zoom Out';
+            gestureName.classList.add('active');
+            prevPinchPos = null;
+            controls.autoRotate = true;
+            // Continuously zoom out while gesture is held
+            targetZoom = Math.min(controls.maxDistance, targetZoom + 0.15);
+            break;
+          }
+
           default: {
             gestureName.textContent = 'Tracking...';
             gestureName.classList.remove('active');
@@ -1019,9 +1057,18 @@
         photoGroup.rotation.y += (pinchRotationY - photoGroup.rotation.y) * 0.08;
         photoGroup.rotation.x += (pinchRotationX - photoGroup.rotation.x) * 0.08;
       } else {
-        // Slowly return pinch rotation tracking to current group rotation
         pinchRotationY = photoGroup.rotation.y;
         pinchRotationX = photoGroup.rotation.x;
+      }
+
+      // Apply gesture zoom (smooth lerp toward target)
+      if (handActive && (currentGesture === 'thumbs_up' || currentGesture === 'thumbs_down')) {
+        const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+        const currentDist = camera.position.distanceTo(controls.target);
+        const newDist = currentDist + (targetZoom - currentDist) * 0.06;
+        camera.position.copy(controls.target).addScaledVector(dir, newDist);
+      } else {
+        targetZoom = camera.position.distanceTo(controls.target);
       }
 
       // Gentle floating motion
